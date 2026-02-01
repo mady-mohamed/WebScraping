@@ -44,7 +44,7 @@ def main():
 
     # Save to CSV
     if all_product_data:
-        filename = "heba_variants.csv"
+        filename = "legacy_app\heba.csv"
         with open(filename, "w", newline="", encoding="utf-8") as f:
             writer = csv.DictWriter(f, fieldnames=all_product_data[0].keys())
             writer.writeheader()
