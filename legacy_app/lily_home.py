@@ -42,7 +42,7 @@ def main():
 
     # Save to CSV
     if all_product_data:
-        filename = "legacy_app\lilly_home_new.csv"
+        filename = r"C:\Users\moham\OneDrive\Desktop\WebScraping\legacy_app\lily_home.csv"
         with open(filename, "w", newline="", encoding="utf-8") as f:
             writer = csv.DictWriter(f, fieldnames=all_product_data[0].keys())
             writer.writeheader()
