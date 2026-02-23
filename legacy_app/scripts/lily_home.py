@@ -1,145 +1,78 @@
-import csv
-import requests
-from bs4 import BeautifulSoup
-import time
-from datetime import datetime
-from functions import get_handles_from_page, extract_product_data
+# %%
+import pandas as pd
+file = r'C:\Users\moham\OneDrive\Desktop\WebScraping\legacy_app\lily_home.csv'
+df = pd.read_csv(file)
+df = df[df['Description'].fillna('').str.strip() != ""]
+df = df.dropna()
+df
 
-BASE = "https://eg.lilly-home.com/"
+# %%
+import pandas as pd
 
-def main():
-    page = 1
-    all_product_data = []
-    all_handles_seen = set()
-    total_failed_handles = []
+# 1. Clean the 'Description' column BEFORE merging to remove new lines
+df['Description'] = df['Description'].str.replace(r'\n|\r', ' ', regex=True)
 
-    print("Starting Scrape...")
+# 2. Updated aggregation rules to create clean strings instead of Python lists
+# We use ', '.join() to make "White, Cream" instead of "['White', 'Cream']"
+aggregation_rules = {
+    'Variant': lambda x: ', '.join(map(str, x.unique())), 
+    'Variant ID': lambda x: ', '.join(map(str, x.unique())),
+    'SKU': lambda x: ', '.join(map(str, x.unique())),
+    'Handle': 'first',
+    'Availability': 'first',
+    'Product URL': 'first',
+    'Scraped at': 'first'
+}
 
-    while True:
-        print(f"Scanning Page {page} for handles...")
-        handles_on_page = get_handles_from_page(BASE, page)
-        
-        # Determine which handles are actually new
-        new_handles = handles_on_page - all_handles_seen
-        
-        if not new_handles:
-            print("No new handles found. Ending search.")
-            break
-        
-        print(f"Found {len(new_handles)} new products. Starting deep scrape...")
-        
-        # Update our master "seen" set
-        all_handles_seen.update(new_handles)
-        
-        # Scrape the specific data for these new handles
-        page_data, page_failed = extract_product_data(BASE, new_handles)
-        
-        all_product_data.extend(page_data)
-        total_failed_handles.extend(page_failed)
-        
-        print(f"Page {page} complete. Total variants collected: {len(all_product_data)}")
-        page += 1
+# Group by the "Core" identity
+df_merged = df.groupby(['Product', 'Description', 'Price'], as_index=False).agg(aggregation_rules)
 
-    # Save to CSV
-    if all_product_data:
-        filename = r"C:\Users\moham\OneDrive\Desktop\WebScraping\legacy_app\lily_home.csv"
-        with open(filename, "w", newline="", encoding="utf-8") as f:
-            writer = csv.DictWriter(f, fieldnames=all_product_data[0].keys())
-            writer.writeheader()
-            writer.writerows(all_product_data)
-        print(f"Successfully saved {len(all_product_data)} variants to {filename}")
-    else:
-        print("No data collected.")
+# 3. FIX: Create the Hollistic Description correctly
+# Use .astype(str) instead of str() to handle it row-by-row
+df_merged['Hollistic Description'] = (
+    df_merged['Product'] + 
+    ' - ' + 
+    df_merged['Variant'].astype(str) + 
+    ": " + 
+    df_merged["Description"]
+)
 
-    if total_failed_handles:
-        print(f"Failed handles: {total_failed_handles}")
+# Reorder columns
+columns_order = [
+    'Product', 'Variant', 'Price', 'Handle', 'Variant ID', 
+    'Availability', 'SKU', 'Product URL', 'Scraped at', 
+    'Description', 'Hollistic Description'
+]
+df_merged = df_merged[columns_order]
 
-if __name__ == "__main__":
-    main()
-# page = 1
-# all_product_data = [] # MASTER LIST to hold everything
-# all_handles = set()
-# failed_handles = []
+# Save to CSV (index=False prevents that extra "0, 1, 2" column at the start)
+df_merged.to_csv(r'C:\Users\moham\OneDrive\Desktop\WebScraping\legacy_app\lilly_home_compact_view.csv', index=False)
+df_merged
 
-# while True:
-#     url = f"{BASE}/collections/all?page={page}"
-#     response = requests.get(url, timeout=5)
-    
+# %%
+'''
+Products Table
+'''
+df_products = df_merged
+df_products = df_products.drop(columns=['Variant', 'Price', 'Variant ID', 'Availability', 'SKU'])
+df_products.to_csv(r'C:\Users\moham\OneDrive\Desktop\WebScraping\legacy_app\lilly_home_products.csv', index=False)
+df_products
 
-#     if response.status_code == 200:
-#         soup = BeautifulSoup(response.text, "html.parser")
-#         handles = set()
-        
-#         # Extract clean handles
-#         for a in soup.select('a[href^="/products/"]'):
-#             handle = a.get("href", "").partition('/products/')[-1].split('?')[0].strip('/')
-#             if handle:
-#                 handles.add(handle)
+# %%
+'''
+Variants Table
+'''
 
-#         new_handles = handles - all_handles
-#         if len(new_handles) == 0: break
-#         else: all_handles |= new_handles
-#         print(f"Found {len(new_handles)} handles. Starting deep scrape...")
-        
-        
-#         for handle in new_handles:
-#             product = None
-#             product_url = None
+df_variants = df
+df_variants = df_variants.drop(columns=['Product', "Product URL", 'Description'])
+cols_to_move = ['Variant ID', 'Handle', 'Variant', 'Price', 'SKU', 'Scraped at']
 
-#             for attempt in range(2):
-#                 try:
-                    
-#                     handle_url = f'{BASE}/products/{handle}.js'
-#                     r = requests.get(handle_url, timeout=20)
-#                     if r.status_code != 200:
-#                         raise RuntimeError(f"HTTP {r.status_code}")
-#                     product = r.json()
-#                     product_url = f'{BASE}{product.get("url")}'
-#                     break
-#                 except Exception as e:
-#                     if attempt == 1:
-#                         print(f"FAILED {handle}: {e}")
-#                         failed_handles.append(handle)
-#                     else:
-#                         time.sleep(2)  # brief backoff then retry
-#                         continue
-                    
-#             if product is None: continue
-#             # Extract variants and keep them in the master list
-#             for v in product["variants"]:
-#                 current_datetime = datetime.now()
-#                 item = {
-#                     "Product": product.get("title"),
-#                     "Variant": v.get("title"),
-#                     "Price": v.get("price") / 100.0,
-#                     "Handle": handle,
-#                     "Variant ID": v.get("id"),
-#                     "Availability": v.get("available"),
-#                     "SKU": v.get("sku"),
-#                     "Product URL": product_url,
-#                     "Scraped at": current_datetime.strftime("%Y/%m/%d %I:%M:%S %p")
-#                 }
-#                 all_product_data.append(item)
-            
-#             time.sleep(1) 
-            
+# Get the list of all other columns that aren't in the "move" list
+remaining_cols = [c for c in df_variants.columns if c not in cols_to_move]
 
-#         # Now we can calculate max_rows or total rows easily
-#         print(f"Scrape Complete. Total variants found: {len(all_product_data)}")
-        
-#         print(f"Page {page}: +{len(new_handles)} new products, total variants so far: {len(all_product_data)}")
-#     else:
-#         print(f"Failed to retrieve page: {response.status_code}")
-#         break
-#     page += 1
+# Reorder with move-list first, then the rest
+df_variants = df[cols_to_move + remaining_cols]
+df_variants.to_csv(r'C:\Users\moham\OneDrive\Desktop\WebScraping\legacy_app\lilly_home_variants.csv', index=False)
+df_variants
 
-# print("Failed handles", failed_handles)
 
-# if all_product_data:
-#     with open("lilly_home.csv", "w", newline="", encoding="utf-8") as f:
-#         writer = csv.DictWriter(f, fieldnames=all_product_data[0].keys())
-#         writer.writeheader()
-#         writer.writerows(all_product_data)
-#     print("Saved lilly_home.csv")
-# else:
-#     print("No data collected.")

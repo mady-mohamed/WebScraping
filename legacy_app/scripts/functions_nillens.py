@@ -51,16 +51,68 @@ def clean_html_description(html_content):
         return soup.get_text(separator="\n", strip=True)
     return "\n".join(paragraphs)
 
+# def extract_product_data(base_url, handles):
+#     """Fetches JSON data for handles and returns a list of variant dictionaries."""
+#     results = []
+#     failed = []
+    
+#     for handle in handles:
+#         handle_url = f'{base_url}/products/{handle}.js'
+        
+#         try:
+#             # Added headers here as well
+#             r = requests.get(handle_url, headers=HEADERS, timeout=20)
+#             if r.status_code != 200:
+#                 print(f"FAILED {handle}: HTTP {r.status_code}")
+#                 failed.append(handle)
+#                 continue
+                
+#             product = r.json()
+#             product_url = f'{base_url}/products/{handle}'
+            
+#             raw_description = product.get("description", "")
+#             clean_description = clean_html_description(raw_description)
+                    
+#             for v in product.get("variants", []):
+#                 item = {
+#                     "Product": product.get("title"),
+#                     "Variant": v.get("title"),
+#                     "Price": v.get("price") / 100.0,
+#                     "Handle": handle,
+#                     "Variant ID": v.get("id"),
+#                     "Availability": v.get("available"),
+#                     "SKU": v.get("sku"),
+#                     "Product URL": product_url,
+#                     'Weight': v.get('weight'),
+#                     'Inventory Management': v.get('inventory_management'),
+#                     "Scraped at": datetime.now().strftime("%Y/%m/%d %I:%M:%S %p"),
+#                     "Description": clean_description
+#                 }
+#                 for o in data.get("options", []):
+#                     items['Variant Type'] = o.get('name')
+#                     items['Variants'] = o.get('values')
+#                 results.append(item)
+            
+#             print(f"Successfully scraped: {handle}")
+#             time.sleep(1)  # Respectful delay
+            
+#         except Exception as e:
+#             print(f"Error processing {handle}: {e}")
+#             failed.append(handle)
+            
+#     return results, failed
 def extract_product_data(base_url, handles):
     """Fetches JSON data for handles and returns a list of variant dictionaries."""
     results = []
     failed = []
     
+    # Headers should be defined or passed in
+    HEADERS = {'User-Agent': 'Mozilla/5.0'} 
+    
     for handle in handles:
         handle_url = f'{base_url}/products/{handle}.js'
         
         try:
-            # Added headers here as well
             r = requests.get(handle_url, headers=HEADERS, timeout=20)
             if r.status_code != 200:
                 print(f"FAILED {handle}: HTTP {r.status_code}")
@@ -70,9 +122,14 @@ def extract_product_data(base_url, handles):
             product = r.json()
             product_url = f'{base_url}/products/{handle}'
             
+            # Extract descriptions
             raw_description = product.get("description", "")
-            clean_description = clean_html_description(raw_description)
-
+            # Assuming clean_html_description is defined elsewhere
+            clean_description = clean_html_description(raw_description) if 'clean_html_description' in globals() else raw_description
+            
+            # Map option names for easy lookup (e.g., {0: "Size", 1: "Color"})
+            option_names = {i: opt.get("name") for i, opt in enumerate(product.get("options", []))}
+                    
             for v in product.get("variants", []):
                 item = {
                     "Product": product.get("title"),
@@ -83,9 +140,20 @@ def extract_product_data(base_url, handles):
                     "Availability": v.get("available"),
                     "SKU": v.get("sku"),
                     "Product URL": product_url,
+                    'Weight': v.get('weight'),
+                    'Inventory Management': v.get('inventory_management'),
                     "Scraped at": datetime.now().strftime("%Y/%m/%d %I:%M:%S %p"),
                     "Description": clean_description
                 }
+                
+                # Correctly map the specific values to this variant
+                # Shopify stores variant values in option1, option2, option3
+                for i in range(1, 4):
+                    opt_key = f"option{i}"
+                    if v.get(opt_key):
+                        label = option_names.get(i-1, f"Option {i}")
+                        item[label] = v.get(opt_key)
+
                 results.append(item)
             
             print(f"Successfully scraped: {handle}")

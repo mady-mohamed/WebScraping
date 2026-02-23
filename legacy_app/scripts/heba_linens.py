@@ -44,12 +44,20 @@ def main():
 
     # Save to CSV
     if all_product_data:
-        filename = "legacy_app\heba.csv"
+        filename = r"C:\Users\moham\OneDrive\Desktop\WebScraping\legacy_app\output\heba\heba_raw.csv"
+        # 1. Collect every single unique key present across all dictionaries
+        fieldnames = set()
+        for item in all_product_data:
+            fieldnames.update(item.keys())
+        
+        # 2. Convert set to a sorted list so columns are consistent
+        fieldnames = sorted(list(fieldnames))
+        
         with open(filename, "w", newline="", encoding="utf-8") as f:
-            writer = csv.DictWriter(f, fieldnames=all_product_data[0].keys())
+            # 3. Use the comprehensive list of fieldnames
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
             writer.writeheader()
             writer.writerows(all_product_data)
-        print(f"Successfully saved {len(all_product_data)} variants to {filename}")
     else:
         print("No data collected.")
 
