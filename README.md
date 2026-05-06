@@ -52,7 +52,7 @@ project/
 
 ```bash
 git clone https://github.com/mady-mohamed/WebScraping
-cd <folder>
+cd WebScraping
 ```
 
 ### 2. Create virtual environment
