@@ -1,129 +1,113 @@
-# app.py
-import io
-import pandas as pd
 import streamlit as st
+import pandas as pd
+import scraping  # This refers to your scraping.py file
+from datetime import datetime
 
-from scrapers.shopify_generic import scrape_shopify_all_products, DEFAULT_HEADERS
-from scrapers.ariika import scrape_ariika, ARIika_CATEGORIES
+st.set_page_config(page_title="Product Scraper & Categorizer", layout="wide")
 
-st.set_page_config(page_title="Multi-site Shopify Scraper", layout="wide")
+st.title("🛍️ Web Scraping & Categorization App")
 
-st.title("🧵 Multi-site Product Scraper (Streamlit)")
-st.write("Pick a website, run the scraper, preview results, then download CSV.")
-
-SITES = {
-    "Heba Linens": {"type": "shopify", "base_url": "https://hebalinens.com"},
-    "Lilly Home (EG)": {"type": "shopify", "base_url": "https://eg.lilly-home.com"},
-    "Malaika Linens": {"type": "shopify", "base_url": "https://malaikalinens.com"},
-    "More Cottons": {"type": "shopify", "base_url": "https://morecottons.com"},
-    "Nillens": {"type": "shopify", "base_url": "https://nillens.com"},
-    "Ariika": {"type": "ariika", "base_url": "https://ariika.com"},
+# Complete list of websites
+websites = {
+    "Applemint": 'https://applemintandcocoa.com/', 
+    "Heba": 'https://hebalinens.com/', 
+    "House Babylon": 'https://me.housebabylon.com/',
+    "Junior": 'https://junior-tex.com/', 
+    "Kiabi": 'https://kiabi.eg/', 
+    "Knana": 'https://knana-eg.com/', 
+    "Lilly Home": 'https://eg.lilly-home.com/', 
+    "Lovely Land": 'http://lovelylandeg.com/',
+    "Malaika": 'http://malaikalinens.com/', 
+    "More Cottons": 'http://morecottons.com/', 
+    "Nillens": 'http://nillens.com/', 
+    "Ninos Kids": 'https://www.ninoskids.com/', 
+    "Triconuts": 'https://www.triconuts.com/',
+    "Relax Home":"https://www.relaxhomelinens.com/"
 }
 
-with st.sidebar:
-    st.header("Controls")
-    site_name = st.selectbox("Select site", list(SITES.keys()))
+website_names = list(websites.keys())
 
-    st.subheader("Scrape options")
-    per_product_delay = st.slider("Delay per product (seconds)", 0.0, 3.0, 1.0, 0.1)
-    retries = st.slider("Retries per product", 1, 5, 2, 1)
-    backoff_sec = st.slider("Retry backoff (seconds)", 0.5, 5.0, 2.0, 0.5)
+# --- Sidebar / Selection Logic ---
+st.subheader("Select Websites to Scrape")
 
-    if SITES[site_name]["type"] == "shopify":
-        max_pages = st.number_input("Max collection pages", min_value=1, max_value=1000, value=200, step=10)
+col1, col2 = st.columns(2)
+
+with col1:
+    if st.button("✅ Select All"):
+        for website in website_names:
+            st.session_state[website] = True
+        st.rerun()
+
+with col2:
+    if st.button("❌ Deselect All"):
+        for website in website_names:
+            st.session_state[website] = False
+        st.rerun()
+
+# Create a layout for checkboxes (3 columns)
+st.write("---")
+check_cols = st.columns(3)
+selected_sites = []
+
+for i, website in enumerate(website_names):
+    # Determine which column to place the checkbox in
+    col_idx = i % 3
+    # Link checkbox to session state
+    is_checked = check_cols[col_idx].checkbox(website, key=website)
+    if is_checked:
+        selected_sites.append(website)
+
+st.write("---")
+
+# --- Scraping Execution ---
+if st.button("🚀 Start Scraping", type="primary"):
+    if not selected_sites:
+        st.warning("Please select at least one website.")
     else:
-        max_pages_per_category = st.number_input("Max pages per category", min_value=1, max_value=500, value=100, step=10)
-        categories = st.multiselect("Ariika categories", ARIika_CATEGORIES, default=ARIika_CATEGORIES)
+        df_list = []
+        progress_bar = st.progress(0)
+        status_text = st.empty()
 
-    st.subheader("HTTP")
-    use_custom_ua = st.checkbox("Use custom User-Agent", value=True)
-    custom_ua = st.text_input(
-        "User-Agent",
-        value=DEFAULT_HEADERS["User-Agent"],
-        disabled=not use_custom_ua
-    )
-    headers = {"User-Agent": custom_ua} if use_custom_ua else DEFAULT_HEADERS
+        for idx, site_name in enumerate(selected_sites):
+            status_text.write(f"Currently Scraping: **{site_name}**...")
+            
+            # Update progress
+            progress = (idx) / len(selected_sites)
+            progress_bar.progress(progress)
 
-run = st.button("Run scrape", type="primary")
+            # Call the scrape function from scraping.py
+            try:
+                scraped_df = scraping.scrape_website(websites[site_name])
+                if not scraped_df.empty:
+                    df_list.append(scraped_df)
+                    st.success(f"Finished {site_name}: Found {len(scraped_df)} items.")
+                else:
+                    st.info(f"{site_name} returned no data.")
+            except Exception as e:
+                st.error(f"Error scraping {site_name}: {e}")
 
-if "df" not in st.session_state:
-    st.session_state.df = None
-if "failed_df" not in st.session_state:
-    st.session_state.failed_df = None
+        progress_bar.progress(1.0)
+        status_text.write("✅ All selected sites processed!")
 
-if run:
-    with st.status("Scraping in progress...", expanded=True) as status:
-        st.write(f"Site: **{site_name}**")
+        if df_list:
+            # Combine all results
+            combined_raw_df = pd.concat(df_list, ignore_index=True)
+            
+            # Run the cleaning and categorization logic
+            with st.spinner("Cleaning and applying Category Keywords..."):
+                final_df = scraping.clean_df(combined_raw_df)
+            
+            st.subheader("Scraped & Categorized Data")
+            st.write(f"Total Unique Products: {len(final_df)}")
+            st.dataframe(final_df, use_container_width=True)
 
-        try:
-            if SITES[site_name]["type"] == "shopify":
-                rows, failed = scrape_shopify_all_products(
-                    SITES[site_name]["base_url"],
-                    max_pages=int(max_pages),
-                    per_product_delay=float(per_product_delay),
-                    retries=int(retries),
-                    backoff_sec=float(backoff_sec),
-                    headers=headers,
-                )
-            else:
-                rows, failed = scrape_ariika(
-                    categories=categories,
-                    max_pages_per_category=int(max_pages_per_category),
-                    per_product_delay=float(per_product_delay),
-                    retries=int(retries),
-                    backoff_sec=float(backoff_sec),
-                    headers=headers,
-                )
-
-            df = pd.DataFrame(rows)
-            failed_df = pd.DataFrame({"Handle": failed})
-
-            st.session_state.df = df
-            st.session_state.failed_df = failed_df
-
-            status.update(label="Scrape complete ✅", state="complete", expanded=False)
-
-        except Exception as e:
-            status.update(label="Scrape failed ❌", state="error", expanded=True)
-            st.exception(e)
-
-df = st.session_state.df
-failed_df = st.session_state.failed_df
-
-if df is not None:
-    col1, col2, col3 = st.columns([2, 1, 1])
-
-    with col1:
-        st.subheader("Results preview")
-        st.caption(f"Rows: {len(df)} | Columns: {len(df.columns)}")
-        st.dataframe(df, use_container_width=True, height=520)
-
-    with col2:
-        st.subheader("Failed handles")
-        if failed_df is not None and len(failed_df) > 0:
-            st.dataframe(failed_df, use_container_width=True, height=520)
-        else:
-            st.write("No failures 🎉")
-
-    with col3:
-        st.subheader("Download")
-        csv_bytes = df.to_csv(index=False).encode("utf-8")
-        st.download_button(
-            "Download results CSV",
-            data=csv_bytes,
-            file_name=f"{site_name.lower().replace(' ', '_')}_variants.csv",
-            mime="text/csv",
-            use_container_width=True,
-        )
-
-        if failed_df is not None and len(failed_df) > 0:
-            failed_bytes = failed_df.to_csv(index=False).encode("utf-8")
+            # Download Button
+            csv = final_df.to_csv(index=False).encode('utf-8-sig')
             st.download_button(
-                "Download failed handles CSV",
-                data=failed_bytes,
-                file_name=f"{site_name.lower().replace(' ', '_')}_failed_handles.csv",
+                label="📥 Download Categorized Data as CSV",
+                data=csv,
+                file_name=f"scraped_products_{datetime.now().strftime('%Y%m%d')}.csv",
                 mime="text/csv",
-                use_container_width=True,
             )
-else:
-    st.info("Pick a site and click **Run scrape**.")
+        else: 
+            st.error("No data was collected from any site.")
