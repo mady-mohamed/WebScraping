@@ -2,4 +2,9 @@ streamlit
 pandas
 requests
 beautifulsoup4
-lxml
+sentence-transformers
+networkx
+numpy
+torch
+scikit-learn
+transformers

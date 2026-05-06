@@ -213,7 +213,7 @@ def scrape_website(website):
                     }
                     all_product_data.append(item)
             
-            time.sleep(0.2)
+            time.sleep(0.5)
         
         page += 1
         
