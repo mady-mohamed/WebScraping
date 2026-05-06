@@ -2,6 +2,9 @@
 
 A Streamlit-based Web Scraping application that collects product data from multiple Shopify-powered e-commerce websites, categorizes products using keyword-based classification, and groups semantically similar products using sentence embeddings and clustering.
 
+<img width="1738" height="702" alt="image" src="https://github.com/user-attachments/assets/3ca664a3-83ad-4d9e-83e0-b4cd2313e21e" />
+
+
 ## Features
 
 - Scrape multiple websites
