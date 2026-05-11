@@ -2,3 +2,5 @@
 /.vscode
 /__pycache__
 /legacy_app/
+test.py
+test.ipynb

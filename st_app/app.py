@@ -199,7 +199,7 @@ for i, name in enumerate(website_names):
 st.write("---")
 
 # --- Scraping Execution ---
-if st.button("🚀 Start Scraping", type="primary"):
+if st.button("Start Scraping", type="primary"):
     if not selected_sites:
         st.warning("Please select at least one website.")
     else:
