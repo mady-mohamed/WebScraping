@@ -232,7 +232,7 @@ if st.button("Start Scraping", type="primary"):
                 final_df = scraping.clean_df(combined_raw_df)
             
             st.subheader("Scraped & Categorized Data")
-            st.write(f"Total Unique Products: {len(final_df)}")
+            # st.write(f"Total Unique Products: {len(final_df)}")
             st.dataframe(final_df, use_container_width=True)
 
             csv = final_df.to_csv(index=False).encode('utf-8-sig')

@@ -57,6 +57,7 @@ async def fetch_product_details_async(session, domain, handle, semaphore):
             async with semaphore:
                 async with session.get(json_url, timeout=20) as response:
                     if response.status == 200:
+                        await asyncio.sleep(1)
                         return handle, await response.json(content_type=None)
         except Exception as e:
             print(f"Failed product {handle}: {e}")
@@ -65,7 +66,7 @@ async def fetch_product_details_async(session, domain, handle, semaphore):
 
 async def fetch_many_products(domain, handles):
     async with aiohttp.ClientSession(headers=HEADERS) as session:
-        semaphore = asyncio.Semaphore(10)
+        semaphore = asyncio.Semaphore(5)
         tasks = [
             fetch_product_details_async(session, domain, handle, semaphore)
             for handle in handles
@@ -257,6 +258,7 @@ def clean_df(df):
         df["Cluster ID"] = 0
 
     df["Inventory Management"] = "shopify"
+    df = df.drop_duplicates(subset=['ID'])
 
     return df[
         [
@@ -266,6 +268,7 @@ def clean_df(df):
             "SKU", 
             "Product URL", 
             "Description", 
+            "ID",
             "Category Evidence", 
             "Category", 
             "Cluster ID"
