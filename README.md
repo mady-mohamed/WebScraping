@@ -217,13 +217,13 @@ The exported CSV includes:
 
 Potential enhancements:
 
-- Async scraping
-- Retry queue system
-- Database integration
-- Better clustering thresholds
-- Multi-threaded scraping
-- Image scraping support
-- Export to Excel
-- Product comparison dashboard
-- AI-based category prediction
-- Using a Local or API-based LLM to name the Clusters
+- [x] Async scraping
+- [ ] Retry queue system
+- [ ] Database integration
+- [ ] Better clustering thresholds
+- [ ] Multi-threaded scraping
+- [ ] Image scraping support
+- [ ] Export to Excel
+- [ ] Product comparison dashboard
+- [ ] AI-based category prediction
+- [ ] Using a Local or API-based LLM to name the Clusters
