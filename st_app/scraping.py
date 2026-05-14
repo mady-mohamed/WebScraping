@@ -1,3 +1,5 @@
+from anyio import Semaphore
+from openai import timeout
 import requests, asyncio, aiohttp
 import re
 import pandas as pd
@@ -41,38 +43,96 @@ def extract_new_handles(html, all_handles):
     current_page_handles = set()
     for a in soup.select('a[href*="/products/"]'):
         href = a.get("href", "")
-        handle = href.partition('/products/')[-1].split('?')[0].strip('/')
+        # handle = href.partition('/products/')[-1].split('?')[0].strip('/')
+        handle = href.partition('/products/')[-1].split('?')[0].split('#')[0].strip('/')
         if handle:
             current_page_handles.add(handle)
     
     new_handles = current_page_handles - all_handles
     return new_handles
 
-# Async translation
-async def fetch_product_details_async(session, domain, handle, semaphore):
-    json_url = f'{domain}/products/{handle}.js'
+# # Async translation
+# async def fetch_product_details_async(session, domain, handle, semaphore):
+#     json_url = f'{domain}/products/{handle}.js'
     
-    for attempt in range(2):
-        try:
-            async with semaphore:
-                async with session.get(json_url, timeout=20) as response:
-                    if response.status == 200:
-                        await asyncio.sleep(1)
-                        return handle, await response.json(content_type=None)
-        except Exception as e:
-            print(f"Failed product {handle}: {e}")
-        await asyncio.sleep(1)
-    return handle, None
+#     for attempt in range(2):
+#         try:
+#             async with semaphore:
+#                 async with session.get(json_url, timeout=20) as response:
+#                     if response.status == 200:
+#                         await asyncio.sleep(1)
+#                         return handle, await response.json(content_type=None)
+#         except Exception as e:
+#             print(f"Failed product {handle}: {e}")
+#         await asyncio.sleep(1)
+#     return handle, None
 
-async def fetch_many_products(domain, handles):
+async def fetch_product_details_async(session, domain, handle, semaphore):
+    json_url = f"{domain}/products/{handle}.js"
+
+    async with semaphore:
+        await asyncio.sleep(0.5)
+        try:
+            async with session.get(json_url, timeout=20) as response:
+
+                if response.status == 200:
+                    data = await response.json(content_type=None)
+                    return handle, data, None
+
+                return handle, None, f"HTTP {response.status}"
+
+        except Exception as e:
+            return handle, None, str(e)
+
+async def fetch_many_products(domain, handles, max_retries=3):
+    retry_queue = list(handles)
+    sucessful_results = []
+    failed_results = []
+    
     async with aiohttp.ClientSession(headers=HEADERS) as session:
-        semaphore = asyncio.Semaphore(5)
-        tasks = [
-            fetch_product_details_async(session, domain, handle, semaphore)
-            for handle in handles
-        ]
+        semaphore = asyncio.Semaphore(3)
         
-        return await asyncio.gather(*tasks)
+        for attempt in range(1, max_retries + 1):
+            if not retry_queue:
+                break
+            
+            print(f"Attempt {attempt}: fetching {len(retry_queue)} products")
+            
+            tasks = [
+                fetch_product_details_async(session, domain, handle, semaphore)
+                for handle in retry_queue
+            ]
+            
+            results = await asyncio.gather(*tasks)
+            
+            retry_queue = []
+            
+            for handle, product, error in results:
+                if product:
+                    sucessful_results.append((handle, product))
+                else:
+                    print(f"Retry needed for {handle}: {error}")
+                    retry_queue.append(handle)
+            
+            await asyncio.sleep(2*attempt)
+            
+        if retry_queue:
+            failed_results.extend(retry_queue)
+            
+    if failed_results:
+        print(f'Failed after retries: {failed_results}')
+        
+    return sucessful_results
+
+# async def fetch_many_products(domain, handles):
+#     async with aiohttp.ClientSession(headers=HEADERS) as session:
+#         semaphore = asyncio.Semaphore(5)
+#         tasks = [
+#             fetch_product_details_async(session, domain, handle, semaphore)
+#             for handle in handles
+#         ]
+        
+#         return await asyncio.gather(*tasks)
 
 def parse_product(product, domain, handle, brand):
     # Process Product Details
