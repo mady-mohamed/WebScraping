@@ -218,7 +218,7 @@ The exported CSV includes:
 Potential enhancements:
 
 - [x] Async scraping
-- [ ] Retry queue system
+- [x] Retry queue system
 - [ ] Database integration
 - [ ] Better clustering thresholds
 - [ ] Multi-threaded scraping
