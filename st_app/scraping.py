@@ -84,7 +84,7 @@ async def fetch_product_details_async(session, domain, handle, semaphore):
         except Exception as e:
             return handle, None, str(e)
 
-async def fetch_many_products(domain, handles, max_retries=3):
+async def fetch_many_products(domain, handles, max_retries=5):
     retry_queue = list(handles)
     sucessful_results = []
     failed_results = []
@@ -329,6 +329,7 @@ def clean_df(df):
             "Product URL", 
             "Description", 
             "ID",
+            "Brand",
             "Category Evidence", 
             "Category", 
             "Cluster ID"

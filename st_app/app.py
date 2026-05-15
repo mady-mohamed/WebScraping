@@ -114,7 +114,7 @@
 
 import streamlit as st
 import pandas as pd
-import scraping
+import scraping, database
 from datetime import datetime
 import json
 import os
@@ -136,6 +136,7 @@ def save_websites(websites_dict):
 # --- App Setup ---
 st.set_page_config(page_title="Product Scraper & Categorizer", layout="wide")
 st.title("🛍️ Web Scraping & Categorization App")
+database.init_db()
 
 # Load current websites from JSON
 websites = load_websites()
@@ -198,6 +199,10 @@ for i, name in enumerate(website_names):
 
 st.write("---")
 
+if st.button("Load Saved Products"):
+    saved_df = database.load_products()
+    st.dataframe(saved_df, use_container_width=True)
+
 # --- Scraping Execution ---
 if st.button("Start Scraping", type="primary"):
     if not selected_sites:
@@ -230,11 +235,15 @@ if st.button("Start Scraping", type="primary"):
             combined_raw_df = pd.concat(df_list, ignore_index=True)
             with st.spinner("Cleaning, Categorizing, and Clustering..."):
                 final_df = scraping.clean_df(combined_raw_df)
+                database.save_products(final_df)
+                st.success("Saved results to database")
             
             st.subheader("Scraped & Categorized Data")
             # st.write(f"Total Unique Products: {len(final_df)}")
             st.dataframe(final_df, use_container_width=True)
-
+            
+            st.subheader("Saved Products Database")
+            
             csv = final_df.to_csv(index=False).encode('utf-8-sig')
             st.download_button(
                 label="📥 Download Categorized Data as CSV",
