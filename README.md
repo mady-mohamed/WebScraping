@@ -219,7 +219,7 @@ Potential enhancements:
 
 - [x] Async scraping
 - [x] Retry queue system
-- [ ] Database integration
+- [x] Database integration
 - [ ] Better clustering thresholds
 - [ ] Multi-threaded scraping
 - [ ] Image scraping support
